@@ -19,11 +19,11 @@ const COLORS = {
   error: '#FF4444',
 };
 
-const PERUVIAN_CHANNELS = ['peru', 'peruvian', 'atv', 'america', 'latina', 'panamericana', 'tv peru', 'canal n', 'rex', 'tvperu', '卫视'];
+const PERUVIAN_CHANNELS = ['peru', 'peruvian', 'perú', 'atv', 'america', 'américa', 'latina', 'panamericana', 'tv peru', 'tv perú', 'canal n', 'willax', 'exitosa', 'global', 'bethel', 'liga 1', 'movistar', 'cmd'];
 
 const isPeruvianChannel = (name) => {
-  const lower = name.toLowerCase();
-  return PERUVIAN_CHANNELS.some(p => lower.includes(p));
+  const lower = name.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '');
+  return PERUVIAN_CHANNELS.some(p => lower.includes(p.toLowerCase()));
 };
 
 const sortChannels = (data) => {
@@ -78,26 +78,52 @@ const TVChannelCard = memo(({ item, onPress, isSelected, onFocus }) => {
   );
 });
 
-const SearchBar = memo(({ value, onChange, onClear, onFocus }) => (
-  <View style={styles.searchContainer}>
-    <View style={styles.searchBox}>
-      <Search color={COLORS.gold} size={24} />
-      <TextInput
-        style={styles.searchInput}
-        placeholder="Buscar canales..."
-        placeholderTextColor="#888"
-        value={value}
-        onChangeText={onChange}
-        onFocus={onFocus}
-      />
-      {value.length > 0 && (
-        <TouchableOpacity onPress={onClear}>
-          <X color="#888" size={24} />
-        </TouchableOpacity>
-      )}
+const SearchBar = memo(({ value, onChange, onClear, onClose }) => {
+  const inputRef = useRef(null);
+  
+  useEffect(() => {
+    // Auto focus al input cuando se muestra
+    if (inputRef.current) {
+      setTimeout(() => inputRef.current.focus(), 100);
+    }
+  }, []);
+
+  return (
+    <View style={styles.searchContainer}>
+      <View style={styles.searchBox}>
+        <Search color={COLORS.gold} size={24} />
+        <TextInput
+          ref={inputRef}
+          style={styles.searchInput}
+          placeholder="Buscar canales... (teclea para filtrar)"
+          placeholderTextColor="#888"
+          value={value}
+          onChangeText={onChange}
+          focusable={true}
+          accessible={true}
+          autoFocus={true}
+          returnKeyType="search"
+        />
+        {value.length > 0 && (
+          <TouchableHighlight 
+            onPress={onClear}
+            underlayColor="transparent"
+            style={styles.searchBtn}
+          >
+            <X color="#888" size={24} />
+          </TouchableHighlight>
+        )}
+        <TouchableHighlight 
+          onPress={onClose}
+          underlayColor="transparent"
+          style={styles.searchBtn}
+        >
+          <Text style={styles.closeSearchText}>CERRAR</Text>
+        </TouchableHighlight>
+      </View>
     </View>
-  </View>
-));
+  );
+});
 
 const ChannelInput = memo(({ onSubmit, onClose }) => {
   const [channelNum, setChannelNum] = useState('');
@@ -243,7 +269,7 @@ export default function App() {
             value={searchQuery} 
             onChange={setSearchQuery}
             onClear={handleSearchClear}
-            onFocus={handleSearchFocus}
+            onClose={() => setShowSearch(false)}
           />
         )}
 
@@ -410,7 +436,17 @@ const styles = StyleSheet.create({
     flex: 1, 
     color: '#fff', 
     fontSize: 20, 
-    marginLeft: 15 
+    marginLeft: 15,
+    padding: 10
+  },
+  searchBtn: {
+    padding: 10,
+    marginLeft: 10
+  },
+  closeSearchText: {
+    color: COLORS.gold,
+    fontWeight: 'bold',
+    fontSize: 14
   },
   searchTrigger: { 
     flexDirection: 'row', 
