@@ -12,6 +12,22 @@ import { Tv } from 'lucide-react-native';
 const channelsData = require('./assets/data/cache_channels_v50.json');
 const DESKTOP_UA = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36";
 
+// CONFIGURACIÓN DE CANALES PERUANOS
+const PERUVIAN_KEYWORDS = ['peru', 'perú', 'latina', 'america tv', 'atv', 'panamericana', 'tv peru', 'willax', 'exitosa', 'canal n', 'liga 1'];
+
+const sortChannels = (data) => {
+  if (!Array.isArray(data)) return [];
+  const peruvian = [];
+  const others = [];
+  data.forEach(ch => {
+    const name = (ch.name || "").toLowerCase();
+    const isPeru = PERUVIAN_KEYWORDS.some(key => name.includes(key));
+    if (isPeru) peruvian.push(ch);
+    else others.push(ch);
+  });
+  return [...peruvian, ...others];
+};
+
 function MainApp() {
   const { width } = useWindowDimensions();
   const [canal, setCanal] = useState(null);
@@ -19,7 +35,9 @@ function MainApp() {
   const [isBooting, setIsBooting] = useState(true);
   const [focusedIdx, setFocusedIdx] = useState(0);
   const [showOptions, setShowOptions] = useState(false);
+  const [isSearchFocused, setIsSearchFocused] = useState(false);
   const hideTimer = useRef(null);
+  const searchInputRef = useRef(null);
 
   // AJUSTE DE GRILLA PARA 4 COLUMNAS
   const cardWidth = width > 0 ? (width - 250) / 4 : 250; 
@@ -44,10 +62,13 @@ function MainApp() {
     hideTimer.current = setTimeout(() => setShowOptions(false), 4000);
   };
 
+  // Ordenar canales al inicio
+  const sortedData = useMemo(() => sortChannels(channelsData), []);
+
   const canalesFiltrados = useMemo(() => {
-    if (!Array.isArray(channelsData)) return [];
-    return channelsData.filter(c => c && c.name && c.name.toLowerCase().includes(busqueda.toLowerCase()));
-  }, [busqueda]);
+    if (!Array.isArray(sortedData)) return [];
+    return sortedData.filter(c => c && c.name && c.name.toLowerCase().includes(busqueda.toLowerCase()));
+  }, [busqueda, sortedData]);
 
   if (isBooting) {
     return (
@@ -118,18 +139,21 @@ function MainApp() {
                 <View style={styles.miniGuia}>
                     <Text style={{color:'gold', fontWeight:'bold', marginBottom:15, fontSize:22}}>CANAL: {canal.name}</Text>
                     <ScrollView horizontal showsHorizontalScrollIndicator={false}>
-                        {channelsData.slice(0, 50).map((item, idx) => (
-                            <TouchableHighlight 
-                                key={idx} 
-                                hasTVPreferredFocus={idx === 0}
-                                onFocus={triggerOptions}
-                                onPress={() => { setCanal(item); triggerOptions(); }}
-                                style={styles.guiaItem}
-                                underlayColor="gold"
-                            >
-                                <Image source={{ uri: item.logo }} style={styles.guiaLogo} resizeMode="contain" />
-                            </TouchableHighlight>
-                        ))}
+                        {sortedData.slice(0, 80).map((item, idx) => {
+                            const isCurrent = canal && item.id === canal.id;
+                            return (
+                                <TouchableHighlight 
+                                    key={idx} 
+                                    hasTVPreferredFocus={isCurrent}
+                                    onFocus={triggerOptions}
+                                    onPress={() => { setCanal(item); triggerOptions(); }}
+                                    style={[styles.guiaItem, isCurrent && styles.guiaItemSelected]}
+                                    underlayColor="gold"
+                                >
+                                    <Image source={{ uri: item.logo }} style={styles.guiaLogo} resizeMode="contain" />
+                                </TouchableHighlight>
+                            );
+                        })}
                     </ScrollView>
                 </View>
                 <TouchableHighlight onPress={() => setCanal(null)} onFocus={triggerOptions} style={styles.btnBackVideo} underlayColor="white">
@@ -149,9 +173,22 @@ function MainApp() {
           <Text style={styles.title}>TV LIBRE PRO</Text>
           <Text style={{color:'gold', fontSize:14, marginLeft:5}}>by dev-line.net</Text>
         </View>
-        <View style={styles.searchBox}>
-          <TextInput placeholder="Buscar..." placeholderTextColor="gray" style={{color:'white', fontSize:22}} value={busqueda} onChangeText={setBusqueda} />
-        </View>
+        <TouchableHighlight 
+          onPress={() => searchInputRef.current?.focus()}
+          onFocus={() => setIsSearchFocused(true)}
+          onBlur={() => setIsSearchFocused(false)}
+          style={[styles.searchBox, isSearchFocused && styles.searchBoxFocused]}
+          underlayColor="#222"
+        >
+          <TextInput 
+            ref={searchInputRef}
+            placeholder="Buscar..." 
+            placeholderTextColor="gray" 
+            style={{color:'white', fontSize:22, width: '100%'}} 
+            value={busqueda} 
+            onChangeText={setBusqueda}
+          />
+        </TouchableHighlight>
       </View>
 
       <ScrollView contentContainerStyle={styles.scroll}>
@@ -185,7 +222,8 @@ const styles = StyleSheet.create({
   main: { flex: 1, backgroundColor: '#010206' },
   header: { flexDirection: 'row', justifyContent: 'space-between', padding: 50, alignItems: 'center' },
   title: { color: 'white', fontSize: 55, fontWeight: '900' },
-  searchBox: { backgroundColor: '#111', width: 350, height: 65, borderRadius: 20, justifyContent: 'center', paddingHorizontal: 25 },
+  searchBox: { backgroundColor: '#111', width: 350, height: 65, borderRadius: 20, justifyContent: 'center', paddingHorizontal: 25, borderWidth: 2, borderColor: 'transparent' },
+  searchBoxFocused: { borderColor: 'gold', backgroundColor: '#222' },
   scroll: { paddingHorizontal: 40, paddingBottom: 60 },
   grid: { flexDirection: 'row', flexWrap: 'wrap', justifyContent: 'center' },
   card: { backgroundColor: '#0d1117', height: 200, margin: 15, borderRadius: 30, borderWidth: 3, borderColor: '#222' },
@@ -197,6 +235,7 @@ const styles = StyleSheet.create({
   overlay: { position: 'absolute', bottom: 0, left: 0, right: 0, top: 0, backgroundColor: 'rgba(0,0,0,0.5)', justifyContent: 'flex-end', padding: 40 },
   miniGuia: { backgroundColor: 'rgba(0,0,0,0.92)', padding: 25, borderRadius: 25, borderBottomWidth: 4, borderBottomColor: 'gold', marginBottom: 25 },
   guiaItem: { width: 150, height: 95, backgroundColor: '#111', marginHorizontal: 12, borderRadius: 15, justifyContent: 'center', alignItems: 'center', borderWidth: 2, borderColor: '#333' },
+  guiaItemSelected: { borderColor: 'gold', borderWidth: 4, backgroundColor: '#222' },
   guiaLogo: { width: '85%', height: '85%' },
   btnBackVideo: { alignSelf: 'center', backgroundColor: 'gold', paddingHorizontal: 60, paddingVertical: 20, borderRadius: 20 }
 });
