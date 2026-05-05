@@ -1,0 +1,183 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+  <meta name="description" content="TV Libre — IPTV en Vivo" />
+  <meta name="theme-color" content="#0a0a0f" />
+  <title>TV Libre — IPTV en Vivo</title>
+
+  <!-- Fuentes -->
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=Space+Grotesk:wght@500;600;700&display=swap" rel="stylesheet" />
+
+  <!-- hls.js CDN -->
+  <script src="https://cdn.jsdelivr.net/npm/hls.js@1.5.11/dist/hls.min.js"></script>
+
+  <link rel="stylesheet" href="assets/css/style.css" />
+  
+  <style>
+    /* Optimizaciones para TV */
+    :focus {
+      outline: 3px solid var(--accent-1) !important;
+      outline-offset: 4px;
+      transform: scale(1.05);
+      transition: transform 0.2s ease;
+      z-index: 100;
+    }
+    
+    .channel-card:focus {
+      border-color: #FFFFFF !important;
+      box-shadow: 0 15px 35px rgba(0,0,0,0.8), 0 0 20px rgba(255,255,255,0.2) !important;
+    }
+
+    /* Ocultar scrollbar en TV */
+    ::-webkit-scrollbar {
+      display: none;
+    }
+  </style>
+</head>
+<body>
+
+<header class="navbar" id="navbar">
+  <div class="navbar__brand">
+    <span class="navbar__logo-icon" aria-hidden="true">📡</span>
+    <span class="navbar__logo-text">TV<strong>Libre</strong></span>
+  </div>
+
+  <nav class="navbar__center" aria-label="Filtros de categoría">
+    <div class="category-pills" id="categoryPills" role="tablist">
+      <button class="pill pill--active" data-category="all" role="tab" aria-selected="true" id="pill-all" tabindex="0">
+        Todos
+      </button>
+    </div>
+  </nav>
+
+  <div class="navbar__right">
+    <div class="search-wrap">
+      <span class="search-icon" aria-hidden="true">🔍</span>
+      <input
+        type="search"
+        id="searchInput"
+        class="search-input"
+        placeholder="Buscar canal…"
+        autocomplete="off"
+        aria-label="Buscar canal"
+        tabindex="0"
+      />
+    </div>
+    <button class="btn-refresh" id="btnRefresh" title="Actualizar lista" aria-label="Actualizar lista de canales" tabindex="0">
+      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+        <polyline points="23 4 23 10 17 10"/><polyline points="1 20 1 14 7 14"/>
+        <path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"/>
+      </svg>
+    </button>
+  </div>
+</header>
+
+<div class="player-overlay" id="playerOverlay" role="dialog" aria-modal="true" aria-label="Reproductor de canal" hidden>
+  <div class="player-modal" id="playerModal">
+    <div class="player-header">
+      <div class="player-info">
+        <span class="player-live-badge">● EN VIVO</span>
+        <h2 class="player-title" id="playerTitle">Canal</h2>
+        <span class="player-category" id="playerCategory"></span>
+      </div>
+      <button class="player-close" id="playerClose" aria-label="Cerrar reproductor" tabindex="0">
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round">
+          <line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/>
+        </svg>
+      </button>
+    </div>
+
+    <div class="player-wrap">
+      <video
+        id="videoPlayer"
+        class="video-element"
+        controls
+        playsinline
+        autoplay
+        muted
+      ></video>
+      <div id="iframe-container" style="display: none; width: 100%; height: 100%; background: #000;"></div>
+      <div class="player-loading" id="playerLoading" aria-live="polite">
+        <div class="spinner"></div>
+        <p>Conectando con el stream…</p>
+      </div>
+      <div class="player-error" id="playerError" hidden>
+        <span class="error-icon">⚠️</span>
+        <p id="playerErrorMsg">No se pudo reproducir el stream.</p>
+        <button class="btn-retry" id="btnRetry" tabindex="0">Reintentar</button>
+      </div>
+    </div>
+
+    <div class="player-footer" style="display: flex; justify-content: space-between; flex-wrap: wrap;">
+      <div class="server-selector" id="serverSelector" style="display: flex; gap: 0.5rem; align-items: center;">
+        <span style="font-size: 0.75rem; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.05em;">Servidor:</span>
+        <div id="serverButtons" style="display: flex; gap: 0.4rem;">
+          <!-- Botones inyectados -->
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<main class="main" id="main">
+  <section class="hero">
+    <div class="hero__content">
+      <h1 class="hero__title">
+        Televisión sin fronteras,<br />
+        <span class="gradient-text">en tiempo real.</span>
+      </h1>
+      <p class="hero__subtitle">
+        Más de <span id="channelCount" class="hero__count">—</span> canales en vivo
+      </p>
+    </div>
+    <div class="hero__orb" aria-hidden="true"></div>
+  </section>
+
+  <div class="stats-bar" id="statsBar">
+    <div class="stat">
+      <span class="stat__value" id="statTotal">—</span>
+      <span class="stat__label">Canales</span>
+    </div>
+    <div class="stat-divider"></div>
+    <div class="stat">
+      <span class="stat__value" id="statCategories">—</span>
+      <span class="stat__label">Categorías</span>
+    </div>
+  </div>
+
+  <section class="channels-section">
+    <div class="channels-grid" id="channelsGrid"></div>
+  </section>
+</main>
+
+<script>
+  // Script para comunicación con Expo
+  window.sendToExpo = function(message) {
+    if (window.ReactNativeWebView) {
+      window.ReactNativeWebView.postMessage(message);
+    }
+  };
+
+  // Monitorear video para orientación
+  const video = document.getElementById('videoPlayer');
+  video.addEventListener('play', () => sendToExpo('requestLandscape'));
+  video.addEventListener('pause', () => sendToExpo('requestPortrait'));
+  video.addEventListener('ended', () => sendToExpo('requestPortrait'));
+
+  // Cerrar reproductor con botón Back del control remoto (si el navegador lo mapea a Escape)
+  document.addEventListener('keydown', (e) => {
+    if (e.key === 'Escape' || e.key === 'Back' || e.keyCode === 10009) {
+      const overlay = document.getElementById('playerOverlay');
+      if (!overlay.hidden) {
+        document.getElementById('playerClose').click();
+      }
+    }
+  });
+</script>
+<script src="assets/js/app.js"></script>
+</body>
+</html>
